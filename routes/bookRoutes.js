@@ -9,18 +9,19 @@ const router = express.Router();
 // Get all books
 router.get('/', async (req, res) => {
     try {
-        const books = await db.collection('books')
+        const books = await db
+            .collection('books')
             .find()
             .sort({ createdAt: -1 })
             .toArray();
 
         res.status(200).send({
             success: true,
-            books: books
+            books
         });
 
     } catch (error) {
-        console.log('Get books error:', error);
+        console.log('Get all books error:', error);
 
         res.status(500).send({
             success: false,
@@ -30,27 +31,27 @@ router.get('/', async (req, res) => {
 });
 
 
-// Get books added by a specific user
-router.get('/my-books/:email', async (req, res) => {
+// Get latest 6 books for New Arrivals
+router.get('/latest', async (req, res) => {
     try {
-        const email = req.params.email;
-
-        const books = await db.collection('books')
-            .find({ userEmail: email })
+        const books = await db
+            .collection('books')
+            .find()
             .sort({ createdAt: -1 })
+            .limit(6)
             .toArray();
 
         res.status(200).send({
             success: true,
-            books: books
+            books
         });
 
     } catch (error) {
-        console.log('Get my books error:', error);
+        console.log('Get latest books error:', error);
 
         res.status(500).send({
             success: false,
-            message: 'Failed to fetch your books.'
+            message: 'Failed to fetch latest books.'
         });
     }
 });
@@ -96,7 +97,7 @@ router.get('/:id', async (req, res) => {
 
 
 // Add a new book
-router.post('/add-book', async (req, res) => {
+router.post('/', async (req, res) => {
     try {
         const {
             title,
@@ -160,7 +161,7 @@ router.post('/add-book', async (req, res) => {
 
 
 // Update a book
-router.put('/:id', async (req, res) => {
+router.patch('/:id', async (req, res) => {
     try {
         const bookId = req.params.id;
 

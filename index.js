@@ -6,6 +6,7 @@ import cors from 'cors';
 
 import bookRoutes from './routes/bookRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import borrowRoutes from './routes/borrowRoutes.js';
 
 const app = express();
 const PORT = 8000;
@@ -20,6 +21,7 @@ app.use(express.json());
 // Routes
 app.use('/api/upload', uploadRoutes);
 app.use('/api/books', bookRoutes);
+app.use('/api/borrows', borrowRoutes);
 
 // MongoDB connection
 const client = new MongoClient(process.env.MONGODB_URI);
