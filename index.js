@@ -3,8 +3,8 @@ import express from 'express';
 import { MongoClient } from 'mongodb';
 import 'dotenv/config';
 import cors from 'cors';
-import bookRoutes from './routes/bookRoutes.js';
 
+import bookRoutes from './routes/bookRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 
 const app = express();
@@ -17,9 +17,8 @@ app.use(cors({
 
 app.use(express.json());
 
-// Upload routes
+// Routes
 app.use('/api/upload', uploadRoutes);
-
 app.use('/api/books', bookRoutes);
 
 // MongoDB connection
@@ -34,6 +33,7 @@ async function connectToMongoDB() {
         db = client.db('booknook');
 
         console.log('Successfully connected to MongoDB!');
+
     } catch (error) {
         console.log('MongoDB connection failed:', error);
         throw error;
@@ -53,6 +53,7 @@ async function startServer() {
         app.listen(PORT, () => {
             console.log(`BookNook server running on port ${PORT}`);
         });
+
     } catch (error) {
         console.log('Server could not start.');
     }

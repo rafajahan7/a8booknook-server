@@ -4,7 +4,30 @@ import { db } from '../index.js';
 
 const router = express.Router();
 
-// Add a new book
+
+router.get('/', async (req, res) => {
+    try {
+        const books = await db.collection('books')
+            .find()
+            .sort({ createdAt: -1 })
+            .toArray();
+
+        res.status(200).send({
+            success: true,
+            books: books
+        });
+
+    } catch (error) {
+        console.log('Get books error:', error);
+
+        res.status(500).send({
+            success: false,
+            message: 'Failed to fetch books.'
+        });
+    }
+});
+
+
 router.post('/add-book', async (req, res) => {
     try {
         const {
@@ -17,7 +40,7 @@ router.post('/add-book', async (req, res) => {
             userEmail
         } = req.body;
 
-        // Check required fields
+     
         if (
             !title ||
             !author ||
@@ -33,7 +56,6 @@ router.post('/add-book', async (req, res) => {
             });
         }
 
-        // Book information
         const newBook = {
             title,
             author,
@@ -55,7 +77,7 @@ router.post('/add-book', async (req, res) => {
             featured: false
         };
 
-        // Save book in MongoDB
+
         const result = await db.collection('books').insertOne(newBook);
 
         res.status(201).send({
