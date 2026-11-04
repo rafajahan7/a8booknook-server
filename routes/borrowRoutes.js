@@ -2,17 +2,23 @@
 import express from 'express';
 import { db } from '../index.js';
 import { ObjectId } from 'mongodb';
+import verifyToken from '../middleware/verifyToken.js';
 
 const router = express.Router();
 
-// Temporary Demo User
-const DEMO_USER_EMAIL = 'demo@booknook.com';
-
 
 // Borrow a book
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
     try {
         const { bookId } = req.body;
+        const userEmail = req.user.email;
+
+        if (!userEmail) {
+            return res.status(401).send({
+                success: false,
+                message: 'User information not found.'
+            });
+        }
 
         if (!bookId) {
             return res.status(400).send({
@@ -68,7 +74,7 @@ router.post('/', async (req, res) => {
             bookId: new ObjectId(bookId),
             bookTitle: book.title,
             bookImage: book.image,
-            userEmail: DEMO_USER_EMAIL,
+            userEmail: userEmail,
             borrowDate: borrowDate,
             returnDate: returnDate,
             returned: false
@@ -104,10 +110,19 @@ router.post('/', async (req, res) => {
 
 
 // Get borrowed books of the logged-in user
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
     try {
+        const userEmail = req.user.email;
+
+        if (!userEmail) {
+            return res.status(401).send({
+                success: false,
+                message: 'User information not found.'
+            });
+        }
+
         const borrows = await db.collection('borrows')
-            .find({ userEmail: DEMO_USER_EMAIL })
+            .find({ userEmail: userEmail })
             .sort({ borrowDate: -1 })
             .toArray();
 
@@ -128,9 +143,17 @@ router.get('/', async (req, res) => {
 
 
 // Return a borrowed book
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verifyToken, async (req, res) => {
     try {
         const borrowId = req.params.id;
+        const userEmail = req.user.email;
+
+        if (!userEmail) {
+            return res.status(401).send({
+                success: false,
+                message: 'User information not found.'
+            });
+        }
 
         if (!ObjectId.isValid(borrowId)) {
             return res.status(400).send({
@@ -141,7 +164,7 @@ router.delete('/:id', async (req, res) => {
 
         const borrow = await db.collection('borrows').findOne({
             _id: new ObjectId(borrowId),
-            userEmail: DEMO_USER_EMAIL
+            userEmail: userEmail
         });
 
         if (!borrow) {
@@ -162,6 +185,7 @@ router.delete('/:id', async (req, res) => {
         const result = await db.collection('borrows').updateOne(
             {
                 _id: new ObjectId(borrowId),
+                userEmail: userEmail,
                 returned: { $ne: true }
             },
             {

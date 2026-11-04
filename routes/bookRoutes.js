@@ -2,11 +2,12 @@
 import express from 'express';
 import { db } from '../index.js';
 import { ObjectId } from 'mongodb';
+import verifyToken from '../middleware/verifyToken.js';
 
 const router = express.Router();
 
 
-// Get all books
+// Get all books (Public)
 router.get('/', async (req, res) => {
     try {
         const books = await db
@@ -31,7 +32,7 @@ router.get('/', async (req, res) => {
 });
 
 
-// Get latest 6 books for New Arrivals
+// Get latest 6 books (Public)
 router.get('/latest', async (req, res) => {
     try {
         const books = await db
@@ -57,7 +58,34 @@ router.get('/latest', async (req, res) => {
 });
 
 
-// Get a single book by ID
+// Get books added by logged-in user (Protected)
+router.get('/my-books', verifyToken, async (req, res) => {
+    try {
+        const userEmail = req.user.email;
+
+        const books = await db
+            .collection('books')
+            .find({ userEmail: userEmail })
+            .sort({ createdAt: -1 })
+            .toArray();
+
+        res.status(200).send({
+            success: true,
+            books
+        });
+
+    } catch (error) {
+        console.log('Get my books error:', error);
+
+        res.status(500).send({
+            success: false,
+            message: 'Failed to fetch your books.'
+        });
+    }
+});
+
+
+// Get a single book by ID (Public)
 router.get('/:id', async (req, res) => {
     try {
         const bookId = req.params.id;
@@ -82,7 +110,7 @@ router.get('/:id', async (req, res) => {
 
         res.status(200).send({
             success: true,
-            book: book
+            book
         });
 
     } catch (error) {
@@ -96,18 +124,19 @@ router.get('/:id', async (req, res) => {
 });
 
 
-// Add a new book
-router.post('/', async (req, res) => {
+// Add a new book (Protected)
+router.post('/', verifyToken, async (req, res) => {
     try {
         const {
             title,
             author,
             category,
             image,
-            description,
-            userName,
-            userEmail
+            description
         } = req.body;
+
+        const userEmail = req.user.email;
+        const userName = req.user.name;
 
         if (
             !title ||
@@ -115,8 +144,8 @@ router.post('/', async (req, res) => {
             !category ||
             !image ||
             !description ||
-            !userName ||
-            !userEmail
+            !userEmail ||
+            !userName
         ) {
             return res.status(400).send({
                 success: false,
@@ -160,8 +189,8 @@ router.post('/', async (req, res) => {
 });
 
 
-// Update a book
-router.patch('/:id', async (req, res) => {
+// Update a book (Protected - Owner Only)
+router.patch('/:id', verifyToken, async (req, res) => {
     try {
         const bookId = req.params.id;
 
@@ -188,7 +217,10 @@ router.patch('/:id', async (req, res) => {
         }
 
         const result = await db.collection('books').updateOne(
-            { _id: new ObjectId(bookId) },
+            {
+                _id: new ObjectId(bookId),
+                userEmail: req.user.email
+            },
             {
                 $set: {
                     title,
@@ -203,7 +235,7 @@ router.patch('/:id', async (req, res) => {
         if (result.matchedCount === 0) {
             return res.status(404).send({
                 success: false,
-                message: 'Book not found.'
+                message: 'Book not found or you are not the owner.'
             });
         }
 
@@ -223,8 +255,8 @@ router.patch('/:id', async (req, res) => {
 });
 
 
-// Delete a book
-router.delete('/:id', async (req, res) => {
+// Delete a book (Protected - Owner Only)
+router.delete('/:id', verifyToken, async (req, res) => {
     try {
         const bookId = req.params.id;
 
@@ -236,13 +268,14 @@ router.delete('/:id', async (req, res) => {
         }
 
         const result = await db.collection('books').deleteOne({
-            _id: new ObjectId(bookId)
+            _id: new ObjectId(bookId),
+            userEmail: req.user.email
         });
 
         if (result.deletedCount === 0) {
             return res.status(404).send({
                 success: false,
-                message: 'Book not found.'
+                message: 'Book not found or you are not the owner.'
             });
         }
 
