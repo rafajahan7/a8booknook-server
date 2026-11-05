@@ -9,56 +9,74 @@ import uploadRoutes from './routes/uploadRoutes.js';
 import borrowRoutes from './routes/borrowRoutes.js';
 
 const app = express();
-const PORT = process.env.PORT || 8000;
-
-// Middleware
-app.use(cors({
-    origin: process.env.CLIENT_URL
-}));
-
-app.use(express.json());
-
-// Routes
-app.use('/api/upload', uploadRoutes);
-app.use('/api/books', bookRoutes);
-app.use('/api/borrows', borrowRoutes);
 
 // MongoDB connection
 const client = new MongoClient(process.env.MONGODB_URI);
 
 export let db;
 
+let connectionPromise;
+
 async function connectToMongoDB() {
-    try {
-        await client.connect();
-
-        db = client.db('booknook');
-
-        console.log('Successfully connected to MongoDB!');
-
-    } catch (error) {
-        console.log('MongoDB connection failed:', error);
-        throw error;
+    if (db) {
+        return db;
     }
+
+    if (!connectionPromise) {
+        connectionPromise = client.connect()
+            .then(() => {
+                db = client.db('booknook');
+
+                console.log('Successfully connected to MongoDB!');
+
+                return db;
+            })
+            .catch((error) => {
+                connectionPromise = null;
+
+                console.log('MongoDB connection failed:', error);
+
+                throw error;
+            });
+    }
+
+    return connectionPromise;
 }
+
+// Middleware
+const allowedOrigins = [
+    process.env.CLIENT_URL,
+    "http://localhost:3000"
+];
+
+app.use(cors({
+    origin: allowedOrigins
+}));
+
+app.use(express.json());
+
+// Connect to MongoDB before handling API requests
+app.use(async (req, res, next) => {
+    try {
+        await connectToMongoDB();
+        next();
+    } catch (error) {
+        res.status(500).send({
+            success: false,
+            message: 'Database connection failed.'
+        });
+    }
+});
+
+// Routes
+app.use('/api/upload', uploadRoutes);
+app.use('/api/books', bookRoutes);
+app.use('/api/borrows', borrowRoutes);
 
 // Test route
 app.get('/', (req, res) => {
     res.send('BookNook Server is Running!');
 });
 
-// Start server
-async function startServer() {
-    try {
-        await connectToMongoDB();
-
-        app.listen(PORT, () => {
-            console.log(`BookNook server running on port ${PORT}`);
-        });
-
-    } catch (error) {
-        console.log('Server could not start.');
-    }
-}
-
-startServer();
+// Export Express app for Vercel
+export default app;
