@@ -7,7 +7,7 @@ import verifyToken from '../middleware/verifyToken.js';
 const router = express.Router();
 
 
-// Borrow a book
+// Borrow a book (Protected)
 router.post('/', verifyToken, async (req, res) => {
     try {
         const { bookId } = req.body;
@@ -20,17 +20,10 @@ router.post('/', verifyToken, async (req, res) => {
             });
         }
 
-        if (!bookId) {
+        if (!bookId || !ObjectId.isValid(bookId)) {
             return res.status(400).send({
                 success: false,
-                message: 'Book ID is required.'
-            });
-        }
-
-        if (!ObjectId.isValid(bookId)) {
-            return res.status(400).send({
-                success: false,
-                message: 'Invalid book ID.'
+                message: 'Valid book ID is required.'
             });
         }
 
@@ -43,6 +36,20 @@ router.post('/', verifyToken, async (req, res) => {
             return res.status(404).send({
                 success: false,
                 message: 'Book not found.'
+            });
+        }
+
+        // Check whether the user has already borrowed this book
+        const existingBorrow = await db.collection('borrows').findOne({
+            bookId: new ObjectId(bookId),
+            userEmail: userEmail,
+            returned: false
+        });
+
+        if (existingBorrow) {
+            return res.status(400).send({
+                success: false,
+                message: 'You have already borrowed this book. Please return it first.'
             });
         }
 
@@ -84,7 +91,7 @@ router.post('/', verifyToken, async (req, res) => {
         try {
             await db.collection('borrows').insertOne(borrowData);
         } catch (error) {
-            // Restore the copy if saving the borrow record fails
+            // Restore the copy if saving fails
             await db.collection('books').updateOne(
                 { _id: new ObjectId(bookId) },
                 { $inc: { availableCopies: 1 } }
@@ -109,7 +116,7 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 
-// Get borrowed books of the logged-in user
+// Get borrowed books of the logged-in user (Protected)
 router.get('/', verifyToken, async (req, res) => {
     try {
         const userEmail = req.user.email;
@@ -142,7 +149,7 @@ router.get('/', verifyToken, async (req, res) => {
 });
 
 
-// Return a borrowed book
+// Return a borrowed book (Protected)
 router.delete('/:id', verifyToken, async (req, res) => {
     try {
         const borrowId = req.params.id;
@@ -162,26 +169,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
             });
         }
 
-        const borrow = await db.collection('borrows').findOne({
-            _id: new ObjectId(borrowId),
-            userEmail: userEmail
-        });
-
-        if (!borrow) {
-            return res.status(404).send({
-                success: false,
-                message: 'Borrow record not found.'
-            });
-        }
-
-        if (borrow.returned) {
-            return res.status(400).send({
-                success: false,
-                message: 'This book has already been returned.'
-            });
-        }
-
-        // Mark the book as returned
+        // Mark as returned only if not already returned
         const result = await db.collection('borrows').updateOne(
             {
                 _id: new ObjectId(borrowId),
@@ -197,11 +185,17 @@ router.delete('/:id', verifyToken, async (req, res) => {
         );
 
         if (result.modifiedCount === 0) {
-            return res.status(400).send({
+            return res.status(404).send({
                 success: false,
-                message: 'This book has already been returned.'
+                message: 'Borrow record not found or book already returned.'
             });
         }
+
+        // Get the borrow record to find the book ID
+        const borrow = await db.collection('borrows').findOne({
+            _id: new ObjectId(borrowId),
+            userEmail: userEmail
+        });
 
         // Increase available copies
         await db.collection('books').updateOne(

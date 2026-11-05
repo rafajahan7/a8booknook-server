@@ -132,11 +132,14 @@ router.post('/', verifyToken, async (req, res) => {
             author,
             category,
             image,
-            description
+            description,
+            totalCopies
         } = req.body;
 
         const userEmail = req.user.email;
         const userName = req.user.name;
+
+        const copies = Number(totalCopies);
 
         if (
             !title ||
@@ -153,6 +156,13 @@ router.post('/', verifyToken, async (req, res) => {
             });
         }
 
+        if (!Number.isInteger(copies) || copies < 1) {
+            return res.status(400).send({
+                success: false,
+                message: 'Total copies must be a positive whole number.'
+            });
+        }
+
         const newBook = {
             title,
             author,
@@ -163,8 +173,8 @@ router.post('/', verifyToken, async (req, res) => {
             userEmail,
             price: 0,
             publishedYear: new Date().getFullYear(),
-            availableCopies: 1,
-            totalCopies: 1,
+            availableCopies: copies,
+            totalCopies: copies,
             createdAt: new Date(),
             rating: 0,
             featured: false
